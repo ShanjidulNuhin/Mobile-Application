@@ -1,6 +1,9 @@
 import 'dart:convert';
+
 import 'package:shared_preferences/shared_preferences.dart';
+
 import 'dart:convert';
+
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 
@@ -18,9 +21,7 @@ class StudentHubApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF4F46E5),
-        ),
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF4F46E5)),
         scaffoldBackgroundColor: const Color(0xFFF8FAFC),
       ),
       home: const MainScreen(),
@@ -108,10 +109,7 @@ class DashboardScreen extends StatelessWidget {
         children: [
           const Text(
             'Hello, Student! 👋',
-            style: TextStyle(
-              fontSize: 27,
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(fontSize: 27, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Text(
@@ -169,7 +167,6 @@ class DashboardScreen extends StatelessWidget {
 
 // TASKS SCREEN
 
-
 class TasksScreen extends StatefulWidget {
   const TasksScreen({super.key});
 
@@ -189,10 +186,10 @@ class _StudentTask {
   bool isCompleted;
 
   Map<String, dynamic> toJson() => {
-        'title': title,
-        'subject': subject,
-        'isCompleted': isCompleted,
-      };
+    'title': title,
+    'subject': subject,
+    'isCompleted': isCompleted,
+  };
 
   factory _StudentTask.fromJson(Map<String, dynamic> json) {
     return _StudentTask(
@@ -204,53 +201,50 @@ class _StudentTask {
 }
 
 class _TasksScreenState extends State<TasksScreen> {
+  @override
+  void initState() {
+    super.initState();
+    _loadTasks();
+  }
+
   static const String _storageKey = 'studenthub_tasks';
 
-Future<void> _saveTasks() async {
-  final prefs = await SharedPreferences.getInstance();
+  Future<void> _saveTasks() async {
+    final prefs = await SharedPreferences.getInstance();
 
-  final data = _tasks
-      .map((task) => jsonEncode(task.toJson()))
-      .toList();
+    final data = _tasks.map((task) => jsonEncode(task.toJson())).toList();
 
-  await prefs.setStringList(_storageKey, data);
-}
-
-Future<void> _loadTasks() async {
-  final prefs = await SharedPreferences.getInstance();
-  final savedTasks = prefs.getStringList(_storageKey);
-
-  if (!mounted || savedTasks == null) return;
-
-  try {
-    final loadedTasks = savedTasks.map((item) {
-      return _StudentTask.fromJson(
-        jsonDecode(item) as Map<String, dynamic>,
-      );
-    }).toList();
-
-    setState(() {
-      _tasks
-        ..clear()
-        ..addAll(loadedTasks);
-    });
-  } catch (e) {
-    debugPrint('Could not load saved tasks: $e');
+    await prefs.setStringList(_storageKey, data);
   }
-}
+
+  Future<void> _loadTasks() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedTasks = prefs.getStringList(_storageKey);
+
+    if (!mounted || savedTasks == null) return;
+
+    try {
+      final loadedTasks = savedTasks.map((item) {
+        return _StudentTask.fromJson(jsonDecode(item) as Map<String, dynamic>);
+      }).toList();
+
+      setState(() {
+        _tasks
+          ..clear()
+          ..addAll(loadedTasks);
+      });
+    } catch (e) {
+      debugPrint('Could not load saved tasks: $e');
+    }
+  }
+
   final List<_StudentTask> _tasks = [
-    _StudentTask(
-      title: 'Complete Flutter UI',
-      subject: 'Mobile Application',
-    ),
+    _StudentTask(title: 'Complete Flutter UI', subject: 'Mobile Application'),
     _StudentTask(
       title: 'Prepare presentation slides',
       subject: 'University Project',
     ),
-    _StudentTask(
-      title: 'Review lecture notes',
-      subject: 'Computer Science',
-    ),
+    _StudentTask(title: 'Review lecture notes', subject: 'Computer Science'),
   ];
 
   Future<void> _addTask() async {
@@ -316,17 +310,16 @@ Future<void> _loadTasks() async {
     setState(() {
       _tasks.add(newTask);
     });
+
+    await _saveTasks();
   }
 
   @override
   Widget build(BuildContext context) {
-    final completedCount =
-        _tasks.where((task) => task.isCompleted).length;
+    final completedCount = _tasks.where((task) => task.isCompleted).length;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('My Tasks'),
-      ),
+      appBar: AppBar(title: const Text('My Tasks')),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _addTask,
         icon: const Icon(Icons.add),
@@ -338,22 +331,15 @@ Future<void> _loadTasks() async {
             padding: const EdgeInsets.all(16),
             child: Card(
               child: ListTile(
-                leading: const Icon(
-                  Icons.check_circle_outline,
-                  size: 32,
-                ),
-                title: Text(
-                  '$completedCount of ${_tasks.length} completed',
-                ),
+                leading: const Icon(Icons.check_circle_outline, size: 32),
+                title: Text('$completedCount of ${_tasks.length} completed'),
                 subtitle: const Text('Keep making progress!'),
               ),
             ),
           ),
           Expanded(
             child: _tasks.isEmpty
-                ? const Center(
-                    child: Text('No tasks yet. Tap + to add one!'),
-                  )
+                ? const Center(child: Text('No tasks yet. Tap + to add one!'))
                 : ListView.builder(
                     padding: const EdgeInsets.fromLTRB(12, 0, 12, 80),
                     itemCount: _tasks.length,
@@ -363,10 +349,12 @@ Future<void> _loadTasks() async {
                       return Card(
                         child: CheckboxListTile(
                           value: task.isCompleted,
-                          onChanged: (value) {
+                          onChanged: (value) async {
                             setState(() {
                               task.isCompleted = value ?? false;
                             });
+
+                            await _saveTasks();
                           },
                           title: Text(
                             task.title,
@@ -377,8 +365,7 @@ Future<void> _loadTasks() async {
                             ),
                           ),
                           subtitle: Text(task.subject),
-                          controlAffinity:
-                              ListTileControlAffinity.leading,
+                          controlAffinity: ListTileControlAffinity.leading,
                         ),
                       );
                     },
@@ -389,7 +376,6 @@ Future<void> _loadTasks() async {
     );
   }
 }
-
 
 // TIMETABLE SCREEN
 
@@ -403,10 +389,7 @@ class TimetableScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: const [
-          Text(
-            'Sample class schedule',
-            style: TextStyle(fontSize: 16),
-          ),
+          Text('Sample class schedule', style: TextStyle(fontSize: 16)),
           SizedBox(height: 20),
           ScheduleTile(
             time: '09:00 AM',
@@ -447,11 +430,7 @@ class ProfileScreen extends StatelessWidget {
               const CircleAvatar(
                 radius: 45,
                 backgroundColor: Color(0xFFE0E7FF),
-                child: Icon(
-                  Icons.person,
-                  size: 50,
-                  color: Color(0xFF4F46E5),
-                ),
+                child: Icon(Icons.person, size: 50, color: Color(0xFF4F46E5)),
               ),
               const SizedBox(height: 16),
               const Text(
@@ -507,9 +486,7 @@ class SummaryCard extends StatelessWidget {
     return Card(
       elevation: 0,
       color: color.withValues(alpha: 0.08),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -560,23 +537,14 @@ class TaskTile extends StatelessWidget {
         contentPadding: const EdgeInsets.all(12),
         leading: const CircleAvatar(
           backgroundColor: Color(0xFFE0E7FF),
-          child: Icon(
-            Icons.check_circle_outline,
-            color: Color(0xFF4F46E5),
-          ),
+          child: Icon(Icons.check_circle_outline, color: Color(0xFF4F46E5)),
         ),
-        title: Text(
-          title,
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
         subtitle: Padding(
           padding: const EdgeInsets.only(top: 5),
           child: Text(subtitle),
         ),
-        trailing: Text(
-          time,
-          style: const TextStyle(fontSize: 11),
-        ),
+        trailing: Text(time, style: const TextStyle(fontSize: 11)),
       ),
     );
   }
@@ -599,10 +567,7 @@ class ScheduleTile extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
-        leading: const Icon(
-          Icons.access_time,
-          color: Color(0xFF4F46E5),
-        ),
+        leading: const Icon(Icons.access_time, color: Color(0xFF4F46E5)),
         title: Text(
           subject,
           style: const TextStyle(fontWeight: FontWeight.w600),
