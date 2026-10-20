@@ -204,6 +204,40 @@ class _StudentTask {
 }
 
 class _TasksScreenState extends State<TasksScreen> {
+  static const String _storageKey = 'studenthub_tasks';
+
+Future<void> _saveTasks() async {
+  final prefs = await SharedPreferences.getInstance();
+
+  final data = _tasks
+      .map((task) => jsonEncode(task.toJson()))
+      .toList();
+
+  await prefs.setStringList(_storageKey, data);
+}
+
+Future<void> _loadTasks() async {
+  final prefs = await SharedPreferences.getInstance();
+  final savedTasks = prefs.getStringList(_storageKey);
+
+  if (!mounted || savedTasks == null) return;
+
+  try {
+    final loadedTasks = savedTasks.map((item) {
+      return _StudentTask.fromJson(
+        jsonDecode(item) as Map<String, dynamic>,
+      );
+    }).toList();
+
+    setState(() {
+      _tasks
+        ..clear()
+        ..addAll(loadedTasks);
+    });
+  } catch (e) {
+    debugPrint('Could not load saved tasks: $e');
+  }
+}
   final List<_StudentTask> _tasks = [
     _StudentTask(
       title: 'Complete Flutter UI',
