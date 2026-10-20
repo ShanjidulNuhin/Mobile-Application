@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 
 void main() {
@@ -179,11 +181,26 @@ class _StudentTask {
   _StudentTask({
     required this.title,
     required this.subject,
-  }) : isCompleted = false;
+    this.isCompleted = false,
+  });
 
   final String title;
   final String subject;
   bool isCompleted;
+
+  Map<String, dynamic> toJson() => {
+        'title': title,
+        'subject': subject,
+        'isCompleted': isCompleted,
+      };
+
+  factory _StudentTask.fromJson(Map<String, dynamic> json) {
+    return _StudentTask(
+      title: json['title'] as String,
+      subject: json['subject'] as String,
+      isCompleted: json['isCompleted'] as bool? ?? false,
+    );
+  }
 }
 
 class _TasksScreenState extends State<TasksScreen> {
