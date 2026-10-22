@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await loadStudentTasks();
+  await loadStudentTimetable();
   runApp(const StudentHubApp());
 }
 
@@ -480,40 +481,435 @@ class _TasksScreenState extends State<TasksScreen> {
 }
 
 // -----------------------------------------------------------------------------
+// TIMETABLE MODEL AND LOCAL STORAGE
+// -----------------------------------------------------------------------------
+
+const String _timetableStorageKey = 'studenthub_timetable';
+
+const List<String> _weekdays = [
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+  'Sunday',
+];
+
+class StudentClassSchedule {
+  StudentClassSchedule({
+    required this.course,
+    required this.day,
+    required this.startMinutes,
+    required this.endMinutes,
+    required this.room,
+  });
+
+  final String course;
+  final String day;
+  final int startMinutes;
+  final int endMinutes;
+  final String room;
+
+  Map<String, dynamic> toJson() => {
+        'course': course,
+        'day': day,
+        'startMinutes': startMinutes,
+        'endMinutes': endMinutes,
+        'room': room,
+      };
+
+  factory StudentClassSchedule.fromJson(Map<String, dynamic> json) {
+    return StudentClassSchedule(
+      course: json['course'] as String? ?? 'Untitled class',
+      day: json['day'] as String? ?? 'Monday',
+      startMinutes: json['startMinutes'] as int? ?? 540,
+      endMinutes: json['endMinutes'] as int? ?? 600,
+      room: json['room'] as String? ?? 'Room not set',
+    );
+  }
+}
+
+final ValueNotifier<List<StudentClassSchedule>> studentTimetable =
+    ValueNotifier<List<StudentClassSchedule>>([]);
+
+Future<void> loadStudentTimetable() async {
+  final prefs = await SharedPreferences.getInstance();
+  final savedClasses = prefs.getStringList(_timetableStorageKey);
+  if (savedClasses == null) return;
+
+  try {
+    studentTimetable.value = savedClasses.map((item) {
+      return StudentClassSchedule.fromJson(
+        jsonDecode(item) as Map<String, dynamic>,
+      );
+    }).toList();
+  } catch (error) {
+    debugPrint('Could not load saved timetable: $error');
+  }
+}
+
+Future<void> saveStudentTimetable() async {
+  final prefs = await SharedPreferences.getInstance();
+  final encodedClasses = studentTimetable.value
+      .map((classItem) => jsonEncode(classItem.toJson()))
+      .toList();
+  await prefs.setStringList(_timetableStorageKey, encodedClasses);
+}
+
+// -----------------------------------------------------------------------------
 // TIMETABLE SCREEN
 // -----------------------------------------------------------------------------
 
-class TimetableScreen extends StatelessWidget {
+class TimetableScreen extends StatefulWidget {
   const TimetableScreen({super.key});
+
+  @override
+  State<TimetableScreen> createState() => _TimetableScreenState();
+}
+
+class _TimetableScreenState extends State<TimetableScreen> {
+  String _selectedDay = 'Monday';
+
+  String _formatTime(int minutes) {
+    final time = TimeOfDay(hour: minutes ~/ 60, minute: minutes % 60);
+    final hour = time.hourOfPeriod == 0 ? 12 : time.hourOfPeriod;
+    final minute = time.minute.toString().padLeft(2, '0');
+    final period = time.period == DayPeriod.am ? 'AM' : 'PM';
+    return '$hour:$minute $period';
+  }
+
+  Future<void> _showClassDialog({StudentClassSchedule? existing}) async {
+    final courseController = TextEditingController(text: existing?.course ?? '');
+    final roomController = TextEditingController(text: existing?.room ?? '');
+    String selectedDay = existing?.day ?? _selectedDay;
+    int startMinutes = existing?.startMinutes ?? 9 * 60;
+    int endMinutes = existing?.endMinutes ?? 10 * 60;
+
+    try {
+      final result = await showDialog<StudentClassSchedule>(
+        context: context,
+        builder: (dialogContext) {
+          return StatefulBuilder(
+            builder: (context, setDialogState) {
+              Future<void> chooseTime({required bool isStart}) async {
+                final currentMinutes = isStart ? startMinutes : endMinutes;
+                final picked = await showTimePicker(
+                  context: dialogContext,
+                  initialTime: TimeOfDay(
+                    hour: currentMinutes ~/ 60,
+                    minute: currentMinutes % 60,
+                  ),
+                );
+                if (picked != null) {
+                  setDialogState(() {
+                    final minutes = picked.hour * 60 + picked.minute;
+                    if (isStart) {
+                      startMinutes = minutes;
+                    } else {
+                      endMinutes = minutes;
+                    }
+                  });
+                }
+              }
+
+              return AlertDialog(
+                title: Text(existing == null ? 'Add class' : 'Edit class'),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextField(
+                        controller: courseController,
+                        autofocus: true,
+                        textCapitalization: TextCapitalization.words,
+                        decoration: const InputDecoration(
+                          labelText: 'Course name',
+                          hintText: 'e.g. Database Management Systems',
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        initialValue: selectedDay,
+                        decoration: const InputDecoration(labelText: 'Day'),
+                        items: _weekdays
+                            .map((day) => DropdownMenuItem(
+                                  value: day,
+                                  child: Text(day),
+                                ))
+                            .toList(),
+                        onChanged: (day) {
+                          if (day != null) {
+                            setDialogState(() => selectedDay = day);
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () => chooseTime(isStart: true),
+                              icon: const Icon(Icons.login),
+                              label: Text('Start\n${_formatTime(startMinutes)}'),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () => chooseTime(isStart: false),
+                              icon: const Icon(Icons.logout),
+                              label: Text('End\n${_formatTime(endMinutes)}'),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: roomController,
+                        textCapitalization: TextCapitalization.words,
+                        decoration: const InputDecoration(
+                          labelText: 'Room / location',
+                          hintText: 'e.g. Room 301',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(dialogContext),
+                    child: const Text('Cancel'),
+                  ),
+                  FilledButton(
+                    onPressed: () {
+                      final course = courseController.text.trim();
+                      final room = roomController.text.trim();
+                      if (course.isEmpty || endMinutes <= startMinutes) {
+                        ScaffoldMessenger.of(dialogContext).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Enter a course name and an end time after the start time.',
+                            ),
+                          ),
+                        );
+                        return;
+                      }
+                      Navigator.pop(
+                        dialogContext,
+                        StudentClassSchedule(
+                          course: course,
+                          day: selectedDay,
+                          startMinutes: startMinutes,
+                          endMinutes: endMinutes,
+                          room: room.isEmpty ? 'Room not set' : room,
+                        ),
+                      );
+                    },
+                    child: Text(existing == null ? 'Add class' : 'Save changes'),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+
+      if (!mounted || result == null) return;
+
+      if (existing == null) {
+        studentTimetable.value = [...studentTimetable.value, result];
+      } else {
+        final index = studentTimetable.value.indexOf(existing);
+        if (index != -1) {
+          final updated = [...studentTimetable.value];
+          updated[index] = result;
+          studentTimetable.value = updated;
+        }
+      }
+
+      setState(() => _selectedDay = result.day);
+      await saveStudentTimetable();
+    } finally {
+      courseController.dispose();
+      roomController.dispose();
+    }
+  }
+
+  Future<void> _deleteClass(StudentClassSchedule classItem) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete class?'),
+        content: Text('Remove "${classItem.course}" from your timetable?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+    studentTimetable.value = studentTimetable.value
+        .where((item) => !identical(item, classItem))
+        .toList();
+    await saveStudentTimetable();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('My Timetable')),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: const [
-          Text(
-            'Sample class schedule',
-            style: TextStyle(fontSize: 16),
-          ),
-          SizedBox(height: 20),
-          ScheduleTile(
-            time: '09:00 AM',
-            subject: 'Mobile Application Development',
-            room: 'Room 301',
-          ),
-          ScheduleTile(
-            time: '11:00 AM',
-            subject: 'Database Management Systems',
-            room: 'Room 204',
-          ),
-          ScheduleTile(
-            time: '02:00 PM',
-            subject: 'Data Structures and Algorithms',
-            room: 'Lab 2',
-          ),
-        ],
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _showClassDialog(),
+        icon: const Icon(Icons.add),
+        label: const Text('Add class'),
+      ),
+      body: ValueListenableBuilder<List<StudentClassSchedule>>(
+        valueListenable: studentTimetable,
+        builder: (context, classes, _) {
+          final dayClasses = classes
+              .where((classItem) => classItem.day == _selectedDay)
+              .toList()
+            ..sort((a, b) => a.startMinutes.compareTo(b.startMinutes));
+
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+            children: [
+              const Text(
+                'Your weekly schedule',
+                style: TextStyle(fontSize: 23, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Add your classes and keep your schedule in one place.',
+                style: TextStyle(color: Colors.grey.shade600),
+              ),
+              const SizedBox(height: 18),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: _weekdays.map((day) {
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ChoiceChip(
+                        label: Text(day.substring(0, 3)),
+                        selected: _selectedDay == day,
+                        onSelected: (_) => setState(() => _selectedDay = day),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              if (dayClasses.isEmpty)
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 28,
+                    ),
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.event_available_outlined,
+                          size: 44,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'No classes on $_selectedDay',
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'Tap “Add class” to build your timetable.',
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else
+                ...dayClasses.map((classItem) {
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      leading: Container(
+                        width: 4,
+                        height: 54,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primary,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                      title: Text(
+                        classItem.course,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Text(
+                          '${_formatTime(classItem.startMinutes)} – '
+                          '${_formatTime(classItem.endMinutes)}\n'
+                          '${classItem.room}',
+                        ),
+                      ),
+                      isThreeLine: true,
+                      trailing: PopupMenuButton<String>(
+                        tooltip: 'Class options',
+                        onSelected: (choice) {
+                          if (choice == 'edit') {
+                            _showClassDialog(existing: classItem);
+                          } else if (choice == 'delete') {
+                            _deleteClass(classItem);
+                          }
+                        },
+                        itemBuilder: (context) => const [
+                          PopupMenuItem(
+                            value: 'edit',
+                            child: ListTile(
+                              leading: Icon(Icons.edit_outlined),
+                              title: Text('Edit'),
+                            ),
+                          ),
+                          PopupMenuItem(
+                            value: 'delete',
+                            child: ListTile(
+                              leading: Icon(Icons.delete_outline),
+                              title: Text('Delete'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }),
+              if (classes.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  '${classes.length} class${classes.length == 1 ? '' : 'es'} '
+                  'saved across your week',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                ),
+              ],
+            ],
+          );
+        },
       ),
     );
   }
@@ -626,38 +1022,6 @@ class SummaryCard extends StatelessWidget {
             Text(title, style: const TextStyle(fontSize: 13)),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class ScheduleTile extends StatelessWidget {
-  const ScheduleTile({
-    super.key,
-    required this.time,
-    required this.subject,
-    required this.room,
-  });
-
-  final String time;
-  final String subject;
-  final String room;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        leading: const Icon(
-          Icons.access_time,
-          color: Color(0xFF4F46E5),
-        ),
-        title: Text(
-          subject,
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
-        subtitle: Text(room),
-        trailing: Text(time),
       ),
     );
   }
