@@ -14,8 +14,22 @@ Future<void> main() async {
 // APP
 // -----------------------------------------------------------------------------
 
-class StudentHubApp extends StatelessWidget {
+
+class StudentHubApp extends StatefulWidget {
   const StudentHubApp({super.key});
+
+  @override
+  State<StudentHubApp> createState() => _StudentHubAppState();
+}
+
+class _StudentHubAppState extends State<StudentHubApp> {
+  bool isDarkMode = false;
+
+  void toggleTheme(bool value) {
+    setState(() {
+      isDarkMode = value;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,16 +40,35 @@ class StudentHubApp extends StatelessWidget {
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF4F46E5),
+          brightness: Brightness.light,
         ),
         scaffoldBackgroundColor: const Color(0xFFF8FAFC),
       ),
-      home: const MainScreen(),
+      darkTheme: ThemeData(
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF4F46E5),
+          brightness: Brightness.dark,
+        ),
+      ),
+      themeMode: isDarkMode ? ThemeMode.dark : ThemeMode.light,
+      home: MainScreen(
+        isDarkMode: isDarkMode,
+        onThemeChanged: toggleTheme,
+      ),
     );
   }
 }
 
 class MainScreen extends StatefulWidget {
-  const MainScreen({super.key});
+  final bool isDarkMode;
+  final void Function(bool) onThemeChanged;
+
+  const MainScreen({
+    super.key,
+    required this.isDarkMode,
+    required this.onThemeChanged,
+  });
 
   @override
   State<MainScreen> createState() => _MainScreenState();
@@ -44,17 +77,26 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
 
-  final List<Widget> _screens = const [
-    DashboardScreen(),
-    TasksScreen(),
-    TimetableScreen(),
-    ProfileScreen(),
-  ];
+  // final List<Widget> _screens = const [
+  //   DashboardScreen(),
+  //   TasksScreen(),
+  //   TimetableScreen(),
+  //   ProfileScreen(),
+  // ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _screens[_selectedIndex],
+      body: _selectedIndex == 0
+    ? const DashboardScreen()
+    : _selectedIndex == 1
+        ? const TasksScreen()
+        : _selectedIndex == 2
+            ? const TimetableScreen()
+            : ProfileScreen(
+                isDarkMode: widget.isDarkMode,
+                onThemeChanged: widget.onThemeChanged,
+              ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
         onDestinationSelected: (index) {
@@ -921,7 +963,13 @@ class _TimetableScreenState extends State<TimetableScreen> {
 
 
 class ProfileScreen extends StatelessWidget {
-  const ProfileScreen({super.key});
+  final bool isDarkMode;
+  final void Function(bool) onThemeChanged;
+  const ProfileScreen({
+    super.key,
+    required this.isDarkMode,
+    required this.onThemeChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -982,7 +1030,10 @@ class ProfileScreen extends StatelessWidget {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const SettingsScreen(),
+                        builder: (context) => SettingsScreen(
+                          isDarkMode: isDarkMode,
+                          onThemeChanged: onThemeChanged,
+                        ),
                       ),
                     );
                   },
@@ -1037,8 +1088,13 @@ class EducationScreen extends StatelessWidget {
 
 
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key});
-
+final bool isDarkMode;
+final void Function(bool) onThemeChanged;
+const SettingsScreen({
+super.key,
+required this.isDarkMode,
+required this.onThemeChanged,
+});
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
@@ -1046,6 +1102,12 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   bool darkMode = false;
   bool notificationsEnabled = true;
+
+  @override
+  void initState() {
+    super.initState();
+    darkMode = widget.isDarkMode;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1065,7 +1127,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
           ),
-          SwitchListTile(
+            SwitchListTile(
             secondary: const Icon(Icons.dark_mode_outlined),
             title: const Text('Dark Mode'),
             subtitle: const Text('Change the appearance'),
@@ -1074,6 +1136,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               setState(() {
                 darkMode = value;
               });
+              widget.onThemeChanged(value);
             },
           ),
           SwitchListTile(
