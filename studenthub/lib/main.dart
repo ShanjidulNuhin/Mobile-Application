@@ -919,6 +919,7 @@ class _TimetableScreenState extends State<TimetableScreen> {
 // PROFILE SCREEN
 // -----------------------------------------------------------------------------
 
+
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
@@ -955,22 +956,96 @@ class ProfileScreen extends StatelessWidget {
                 style: TextStyle(color: Colors.grey.shade600),
               ),
               const SizedBox(height: 24),
-              const Card(
+              Card(
                 child: ListTile(
-                  leading: Icon(Icons.school_outlined),
-                  title: Text('Education'),
-                  subtitle: Text('Add your university details later'),
+                  leading: const Icon(Icons.school_outlined),
+                  title: const Text('Education'),
+                  subtitle: const Text('University and academic details'),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const EducationScreen(),
+                      ),
+                    );
+                  },
                 ),
               ),
-              const Card(
+              Card(
                 child: ListTile(
-                  leading: Icon(Icons.settings_outlined),
-                  title: Text('Settings'),
-                  subtitle: Text('More settings coming soon'),
+                  leading: const Icon(Icons.settings_outlined),
+                  title: const Text('Settings'),
+                  subtitle: const Text('Manage your preferences'),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const SettingsScreen(),
+                      ),
+                    );
+                  },
                 ),
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class EducationScreen extends StatelessWidget {
+  const EducationScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Education')),
+      body: const Padding(
+        padding: EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ListTile(
+              leading: Icon(Icons.account_balance),
+              title: Text('University'),
+              subtitle: Text('Not added yet'),
+            ),
+            ListTile(
+              leading: Icon(Icons.computer),
+              title: Text('Department'),
+              subtitle: Text('Not added yet'),
+            ),
+            ListTile(
+              leading: Icon(Icons.badge_outlined),
+              title: Text('Student ID'),
+              subtitle: Text('Not added yet'),
+            ),
+            ListTile(
+              leading: Icon(Icons.calendar_month),
+              title: Text('Current Semester'),
+              subtitle: Text('Not added yet'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class SettingsScreen extends StatelessWidget {
+  const SettingsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Settings')),
+      body: const Center(
+        child: Text(
+          'Settings options will be added here.',
+          style: TextStyle(fontSize: 16),
         ),
       ),
     );
